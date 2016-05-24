@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25123.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hasseware.Net.Wunderlist", "src\Net.Wunderlist\Hasseware.Net.Wunderlist.csproj", "{FA6CA96D-96F9-4EEA-9DD9-E7270909CA72}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hasseware.Net.Wunderlist.Portable", "src\Net.Wunderlist.Portable\Hasseware.Net.Wunderlist.Portable.csproj", "{250FB5DF-3F61-4774-A3A6-8CA47DB2E950}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FA6CA96D-96F9-4EEA-9DD9-E7270909CA72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA6CA96D-96F9-4EEA-9DD9-E7270909CA72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA6CA96D-96F9-4EEA-9DD9-E7270909CA72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA6CA96D-96F9-4EEA-9DD9-E7270909CA72}.Release|Any CPU.Build.0 = Release|Any CPU
+		{250FB5DF-3F61-4774-A3A6-8CA47DB2E950}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{250FB5DF-3F61-4774-A3A6-8CA47DB2E950}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{250FB5DF-3F61-4774-A3A6-8CA47DB2E950}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{250FB5DF-3F61-4774-A3A6-8CA47DB2E950}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

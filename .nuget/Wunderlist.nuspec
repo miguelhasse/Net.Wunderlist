@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+    <metadata>
+      <id>Hasseware.Wunderlist</id>
+      <version>1.0.0.0-beta</version>
+      <title>Wunderlist .NET Client</title>
+      <authors>Miguel Hasse de Oliveira</authors>
+      <owners>Miguel Hasse de Oliveira</owners>
+      <licenseUrl>https://github.com/miguelhasse/Net.Wunderlist/raw/master/LICENSE</licenseUrl>
+      <projectUrl>https://github.com/miguelhasse/Net.Wunderlist</projectUrl>
+      <iconUrl>https://github.com/miguelhasse/Net.Wunderlist/raw/master/.nuget/Package.png</iconUrl>
+      <requireLicenseAcceptance>false</requireLicenseAcceptance>
+      <description>
+        Client library for accessing the Wunderlist API in .NET, that is lightweight and simple to use.
+
+        Supported Platforms:
+        - .NET Framework 4.5
+        - Windows 8
+        - Windows Phone 8.1
+        - Windows Phone Silverlight 8
+        - Portable Class Libraries
+      </description>
+      <summary>Client library for accessing the Wunderlist API in .NET</summary>
+      <releaseNotes>
+      </releaseNotes>
+      <copyright>Copyright 2016 Miguel Hasse de Oliveira</copyright>
+      <language>en-US</language>
+      <tags>Wunderlist PCL Portable Planning</tags>
+      <dependencies>
+          <group targetFramework=".NETFramework4.5">
+              <dependency id="Newtonsoft.Json" version="6.0.6" />
+          </group>
+          <group targetFramework=".NETPortable0.0-net45+win8+wp8+wpa81">
+              <dependency id="Microsoft.Net.Http" version="2.2.28" />
+              <dependency id="Newtonsoft.Json" version="6.0.6" />
+          </group>
+      </dependencies>
+    </metadata>
+    <files>
+      <file src="..\src\Net.Wunderlist\bin\Release\Hasseware.Net.Wunderlist.dll" target="lib\net45\Hasseware.Net.Wunderlist.dll" />
+      <file src="..\src\Net.Wunderlist.Portable\bin\Release\Hasseware.Net.Wunderlist.dll" target="lib\portable-net45+wp8+win8\Hasseware.Net.Wunderlist.dll" />
+    </files>
+</package>
