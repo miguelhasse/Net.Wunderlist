@@ -8,12 +8,12 @@ namespace System.Net.Wunderlist
     {
         internal Resource(JToken jtoken)
         {
-            Id = jtoken.Value<int>("id");
+            Id = jtoken.Value<uint>("id");
             CreatedAt = jtoken.Value<DateTime?>("created_at");
             UpdatedAt = jtoken.Value<DateTime?>("updated_at");
         }
 
-        public int Id { get; internal set; }
+        public uint Id { get; internal set; }
 
         public DateTime? CreatedAt { get; internal set; }
 
@@ -88,11 +88,11 @@ namespace System.Net.Wunderlist
     {
         internal Comment(JToken jtoken) : base(jtoken)
         {
-            TaskId = jtoken.Value<int>("task_id");
+            TaskId = jtoken.Value<uint>("task_id");
             Value = jtoken.Value<string>("text");
         }
 
-        public int TaskId { get; internal set; }
+        public uint TaskId { get; internal set; }
 
         public string Value { get; set; }
     }
@@ -101,20 +101,20 @@ namespace System.Net.Wunderlist
     {
         internal File(JToken jtoken) : base(jtoken)
         {
-            TaskId = jtoken.Value<int>("task_id");
-            ListId = jtoken.Value<int>("list_id");
-            UserId = jtoken.Value<int>("user_id");
+            TaskId = jtoken.Value<uint>("task_id");
+            ListId = jtoken.Value<uint>("list_id");
+            UserId = jtoken.Value<uint>("user_id");
             Name = jtoken.Value<string>("file_name");
             ContentType = jtoken.Value<string>("content_type");
             Size = jtoken.Value<int>("file_size");
             LocalCreatedAt = jtoken.Value<DateTime>("local_created_at");
         }
 
-        public int TaskId { get; internal set; }
+        public uint TaskId { get; internal set; }
 
-        public int ListId { get; internal set; }
+        public uint ListId { get; internal set; }
 
-        public int UserId { get; internal set; }
+        public uint UserId { get; internal set; }
 
         public string Name { get; internal set; }
 
@@ -141,13 +141,13 @@ namespace System.Net.Wunderlist
     {
         internal List(JToken jtoken) : base(jtoken)
         {
-            OwnerId = jtoken.Value<int>("owner_id");
+            OwnerId = jtoken.Value<uint>("owner_id");
             OwnerType = jtoken.Value<string>("owner_type");
             Title = jtoken.Value<string>("title");
             Type = jtoken.Value<string>("type");
         }
 
-        public int OwnerId { get; set; }
+        public uint OwnerId { get; set; }
 
         public string OwnerType { get; set; }
 
@@ -160,15 +160,19 @@ namespace System.Net.Wunderlist
     {
         internal Membership(JToken jtoken) : base(jtoken)
         {
-            UserId = jtoken.Value<int>("user_id");
-            ListId = jtoken.Value<int>("list_id");
+            UserId = jtoken.Value<uint>("user_id");
+            ListId = jtoken.Value<uint>("list_id");
             Owner = jtoken.Value<bool>("owner");
             Muted = jtoken.Value<bool>("muted");
+			
+			MembershipState state;
+			State = (Enum.TryParse(jtoken.Value<string>("state"), true, out state)) ? 
+				state : MembershipState.Pending;
         }
 
-        public int UserId { get; internal set; }
+        public uint UserId { get; internal set; }
 
-        public int ListId { get; internal set; }
+        public uint ListId { get; internal set; }
 
         public MembershipState State { get; internal set; }
 
@@ -183,11 +187,11 @@ namespace System.Net.Wunderlist
     {
         internal Note(JToken jtoken) : base(jtoken)
         {
-            TaskId = jtoken.Value<int>("task_id");
+            TaskId = jtoken.Value<uint>("task_id");
             Value = jtoken.Value<string>("content");
         }
 
-        public int TaskId { get; internal set; }
+        public uint TaskId { get; internal set; }
 
         public string Value { get; set; }
     }
@@ -205,11 +209,11 @@ namespace System.Net.Wunderlist
     {
         internal Reminder(JToken jtoken) : base(jtoken)
         {
-            TaskId = jtoken.Value<int>("task_id");
+            TaskId = jtoken.Value<uint>("task_id");
             Date = jtoken.Value<DateTime>("date");
         }
 
-        public int TaskId { get; internal set; }
+        public uint TaskId { get; internal set; }
 
         public DateTime Date { get; set; }
     }
@@ -230,8 +234,8 @@ namespace System.Net.Wunderlist
         internal TaskBase(JToken jtoken) : base(jtoken)
         {
             Title = jtoken.Value<string>("title");
-            ListId = jtoken.Value<int>("list_id");
-            DueDate = jtoken.Value<DateTime>("due_date");
+            ListId = jtoken.Value<uint>("list_id");
+            DueDate = jtoken.Value<DateTime?>("due_date");
             CreatedBy = jtoken.Value<int>("created_by_id");
             CompletedBy = jtoken.Value<int?>("completed_by_id");
             CompletedAt = jtoken.Value<DateTime?>("due_date");
@@ -239,9 +243,9 @@ namespace System.Net.Wunderlist
 
         public string Title { get; set; } // max lenght 255
 
-        public int ListId { get; internal set; }
+        public uint ListId { get; internal set; }
 
-        public DateTime DueDate { get; set; }
+        public DateTime? DueDate { get; set; }
 
         public int CreatedBy { get; internal set; }
 
@@ -254,14 +258,14 @@ namespace System.Net.Wunderlist
     {
         internal MainTask(JToken jtoken) : base(jtoken)
         {
-            AssigneeId = jtoken.Value<int>("assignee_id");
-            AssignerId = jtoken.Value<int?>("assigner_id");
+            AssigneeId = jtoken.Value<uint>("assignee_id");
+            AssignerId = jtoken.Value<uint?>("assigner_id");
             Starred = jtoken.Value<bool>("starred");
         }
 
-        public int AssigneeId { get; set; }
+        public uint AssigneeId { get; set; }
 
-        public int? AssignerId { get; set; }
+        public uint? AssignerId { get; set; }
 
         public bool Starred { get; internal set; }
     }
@@ -290,16 +294,16 @@ namespace System.Net.Wunderlist
     {
         internal Webhook(JToken jtoken) : base(jtoken)
         {
-            ListId = jtoken.Value<int>("list_id");
-            MembershipId = jtoken.Value<int>("membership_id");
+            ListId = jtoken.Value<uint>("list_id");
+            MembershipId = jtoken.Value<uint>("membership_id");
             Endpoint = jtoken.Value<Uri>("url");
             ProcessorType = jtoken.Value<string>("processor_type");
             Configuration = jtoken.Value<string>("configuration");
         }
 
-        public int ListId { get; set; }
+        public uint ListId { get; set; }
 
-        public int MembershipId { get; set; }
+        public uint MembershipId { get; set; }
 
         public Uri Endpoint { get; set; }
 

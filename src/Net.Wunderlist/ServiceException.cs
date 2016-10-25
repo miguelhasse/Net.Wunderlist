@@ -38,6 +38,7 @@ namespace System.Net.Wunderlist
 
         internal ServiceException(int statusCode, string error) : base(error)
         {
+            this.StatusCode = statusCode;
         }
 
         public int StatusCode { get; private set; }
