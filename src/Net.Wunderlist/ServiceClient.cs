@@ -32,11 +32,12 @@ namespace System.Net.Wunderlist
 			this.client = new HttpClient(Authorization.GetAuthorizationHandler(null, accessToken, clientSecret));
 			this.client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.MediaTypeNames.Json));
 			this.storage = new Lazy<IStorageProvider>(storageFactory);
-
+            
 			this.Files = new FileContext(this);
 			this.Lists = new ListContext(this);
 			this.Memberships = new MembershipContext(this);
-			this.Reminders = new ReminderContext(this);
+            this.Notes = new NoteContext(this);
+            this.Reminders = new ReminderContext(this);
 			this.Comments = new CommentContext(this);
 			this.Tasks = new TaskContext(this);
 			this.Subtasks = new SubtaskContext(this);
@@ -61,7 +62,10 @@ namespace System.Net.Wunderlist
 
 		public IMembershipInfo Memberships { get; private set; }
 
-		public IReminderInfo Reminders { get; private set; }
+        public INoteInfo Notes { get; private set; }
+        
+
+        public IReminderInfo Reminders { get; private set; }
 
 		public ICommentInfo Comments { get; private set; }
 
@@ -265,26 +269,26 @@ namespace System.Net.Wunderlist
 
 				using (var content = await storageProvider.OpenAsync(filename, cancellationToken))
 				{
-					var uploadResource = (JObject)await UploadStartAsync(IO.Path.GetFileName(filename),
+					var uploadResource = await UploadStartAsync(IO.Path.GetFileName(filename),
 						(int)content.Length, contentType, null, null, cancellationToken);
 
-					uint uploadId = uploadResource.Value<uint>("id");
+					uint uploadId = uploadResource.Id;
 					int requiredParts = (int)(content.Length / 5242880) + ((content.Length % 5242880 > 0) ? 1 : 0);
 					var createdAt = DateTime.UtcNow;
 
 					if (requiredParts > 1 && content.CanSeek)
 					{
-						await UploadFilePartAsync(new Internal.ChunkRestrictedStream(0, 5242880, () => content),
-							uploadResource.Value<JObject>("part"), cancellationToken);
+						var stream = new Internal.ChunkRestrictedStream(0, 5242880, () => content);
+						await UploadFilePartAsync(stream, uploadResource, cancellationToken);
 
 						for (int part = 2; part <= requiredParts && !cancellationToken.IsCancellationRequested; part++)
 						{
-							var nextUploadResource = await UploadNextAsync(uploadId, part, null, cancellationToken);
-							await UploadFilePartAsync(new Internal.ChunkRestrictedStream((part - 1) * 5242880, 5242880, () => content),
-								nextUploadResource.Value<JObject>("part"), cancellationToken);
+							uploadResource = await UploadNextAsync(uploadId, part, null, cancellationToken);
+							stream = new Internal.ChunkRestrictedStream((part - 1) * 5242880, 5242880, () => content);
+							await UploadFilePartAsync(stream, uploadResource, cancellationToken);
 						}
 					}
-					else await UploadFilePartAsync(content, uploadResource.Value<JObject>("part"), cancellationToken);
+					else await UploadFilePartAsync(content, uploadResource, cancellationToken);
 
 					await UploadFinishedAsync(uploadId, cancellationToken);
 					//await Task.Delay(TimeSpan.FromMinutes((requiredParts > 1) ? 1 : 0), cancellationToken);
@@ -299,39 +303,36 @@ namespace System.Net.Wunderlist
 				return await client.SendAsync<File>("files", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
 			}
 
-			private async Task UploadFilePartAsync(IO.Stream stream, JObject data, CancellationToken cancellationToken)
+			private async Task UploadFilePartAsync(IO.Stream stream, ResourcePart part, CancellationToken cancellationToken)
 			{
 				using (var uploadClient = new HttpClient(new HttpClientHandler { UseCookies = false }))
 				{
-					var request = new HttpRequestMessage(HttpMethod.Put, data.Value<string>("url")) { Content = new StreamContent(stream) };
-					request.Headers.Add("Authorization", data.Value<string>("authorization"));
-					request.Headers.Add("x-amz-date", data.Value<string>("date"));
+					var request = new HttpRequestMessage(HttpMethod.Put, part.Url) { Content = new StreamContent(stream) };
+					request.Headers.Add("Authorization", part.Authorization);
+					request.Headers.Add("x-amz-date", part.Date);
 
 					var response = await uploadClient.SendAsync(request, cancellationToken);
 					response.EnsureSuccessStatusCode();
 				}
 			}
 
-			private async Task<JObject> UploadStartAsync(string name, int contentLength, string contentType, int? part, string md5sum, CancellationToken cancellationToken)
+			private async Task<ResourcePart> UploadStartAsync(string name, int contentLength, string contentType, int? part, string md5sum, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "file_name", name }, { "file_size", contentLength }, { "content_type", contentType }, { "part_number", part }, { "md5sum", md5sum } };
-				var response = await client.SendAsync("uploads", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
-				return await DeserializeDynamic(response);
+				return await client.SendAsync<ResourcePart>("uploads", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
 			}
 
-			private async Task<JObject> UploadNextAsync(uint uploadId, int part, string md5sum, CancellationToken cancellationToken)
+			private async Task<ResourcePart> UploadNextAsync(uint uploadId, int part, string md5sum, CancellationToken cancellationToken)
 			{
-				string cmd = String.Format("uploads/{0}/parts", uploadId);
+				string cmd = String.Format("uploads/{0}/parts", part);
 				var parameters = new Dictionary<string, object> { { "part_number", part }, { "md5sum", md5sum } };
-				var response = await client.GetAsync(cmd, parameters, cancellationToken).ConfigureAwait(false);
-				return await DeserializeDynamic(response);
+				return await client.GetAsync<ResourcePart>(cmd, parameters, cancellationToken).ConfigureAwait(false);
 			}
 
-			private async Task<JObject> UploadFinishedAsync(uint uploadId, CancellationToken cancellationToken)
+			private async Task UploadFinishedAsync(uint uploadId, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "state", "finished" } };
-				var response = await client.PatchAsync(ServiceClient.BuildCommand("uploads", uploadId), null, requestContent, cancellationToken).ConfigureAwait(false);
-				return await DeserializeDynamic(response);
+				await client.PatchAsync<ResourcePart>(ServiceClient.BuildCommand("uploads", uploadId), null, requestContent, cancellationToken).ConfigureAwait(false);
 			}
 
 			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
@@ -463,6 +464,52 @@ namespace System.Net.Wunderlist
 			public async Task<IEnumerable<Membership>> GetAsync(uint? listId, CancellationToken cancellationToken)
 			{
 				return await client.GetAsync<IEnumerable<Membership>>(ServiceClient.BuildCommand("memberships", listId), null, cancellationToken).ConfigureAwait(false);
+			}
+		}
+
+		private sealed class NoteContext : INoteInfo
+		{
+			private ServiceClient client;
+
+			internal NoteContext(ServiceClient client)
+			{
+				this.client = client;
+			}
+
+			public async Task<Note> GetAsync(uint id, CancellationToken cancellationToken)
+			{
+				return await client.GetAsync<Note>(ServiceClient.BuildCommand("notes", id), null, cancellationToken).ConfigureAwait(false);
+			}
+
+			public async Task<IEnumerable<Note>> GetByListAsync(uint listId, CancellationToken cancellationToken)
+			{
+				var parameters = new Dictionary<string, object> { { "list_id", listId } };
+				return await client.GetAsync<IEnumerable<Note>>("notes", parameters, cancellationToken).ConfigureAwait(false);
+			}
+
+			public async Task<IEnumerable<Note>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
+			{
+				var parameters = new Dictionary<string, object> { { "task_id", taskId } };
+				return await client.GetAsync<IEnumerable<Note>>("notes", parameters, cancellationToken).ConfigureAwait(false);
+			}
+
+			public async Task<Note> CreateAsync(uint taskId, string content, CancellationToken cancellationToken)
+			{
+				var requestContent = new Dictionary<string, object> { { "task_id", taskId }, { "content", content } };
+				return await client.SendAsync<Note>("notes", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+			}
+
+			public async Task<Note> UpdateAsync(uint id, int revision, string content, CancellationToken cancellationToken)
+			{
+				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "content", content } };
+				return await client.PatchAsync<Note>(ServiceClient.BuildCommand("notes", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+			}
+
+			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			{
+				var parameters = new Dictionary<string, object> { { "revision", revision } };
+				await client.SendAsync(ServiceClient.BuildCommand("notes", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+
 			}
 		}
 

@@ -68,6 +68,21 @@ namespace System.Net.Wunderlist
         Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken);
     }
 
+    public interface INoteInfo
+    {
+        Task<Note> GetAsync(uint id, CancellationToken cancellationToken);
+
+        Task<IEnumerable<Note>> GetByListAsync(uint listId, CancellationToken cancellationToken);
+
+        Task<IEnumerable<Note>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken);
+
+        Task<Note> CreateAsync(uint taskId, string content, CancellationToken cancellationToken);
+
+        Task<Note> UpdateAsync(uint id, int revision, string content, CancellationToken cancellationToken);
+
+        Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken);
+    }
+
     public interface IReminderInfo
     {
         Task<Reminder> GetAsync(uint id, CancellationToken cancellationToken);

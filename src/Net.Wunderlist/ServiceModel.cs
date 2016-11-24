@@ -4,6 +4,38 @@ using System.Collections.Generic;
 
 namespace System.Net.Wunderlist
 {
+    internal sealed class ResourcePart
+    {
+        internal ResourcePart(JToken jtoken)
+        {
+            Id = jtoken.Value<uint>("id");
+            UserId = jtoken.Value<uint?>("user_id");
+            State = jtoken.Value<string>("state");
+            ExpiresAt = jtoken.Value<DateTime>("expires_at");
+
+            var part = jtoken.Value<JObject>("part");
+
+            Url = part.Value<string>("url");
+            Authorization = part.Value<string>("authorization");
+            Date = part.Value<string>("date");
+        }
+
+        public uint Id { get; internal set; }
+
+        public uint? UserId { get; internal set; }
+
+        public string State { get; internal set; }
+
+        public DateTime ExpiresAt { get; internal set; }
+
+        public string Url { get; internal set; }
+
+        public string Authorization { get; internal set; }
+
+        public string Date { get; internal set; }
+
+    }
+
     public abstract class Resource
     {
         internal Resource(JToken jtoken)
@@ -181,6 +213,7 @@ namespace System.Net.Wunderlist
         public bool Muted { get; set; }
     }
 
+
     public enum MembershipState { Pending, Accepted }
 
     public class Note : VersionedResource
@@ -188,12 +221,12 @@ namespace System.Net.Wunderlist
         internal Note(JToken jtoken) : base(jtoken)
         {
             TaskId = jtoken.Value<uint>("task_id");
-            Value = jtoken.Value<string>("content");
+            Content = jtoken.Value<string>("content");
         }
 
         public uint TaskId { get; internal set; }
 
-        public string Value { get; set; }
+        public string Content { get; set; }
     }
 
     public class Positions : CollectionResource<int>
