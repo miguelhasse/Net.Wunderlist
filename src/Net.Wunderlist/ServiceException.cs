@@ -27,7 +27,7 @@ namespace System.Net.Wunderlist
                             break;
 
                         default:
-                            var value = keypair.Value.Values<string>().ToArray();
+                            var value = keypair.Value.ToString();
                             Data.Add(keypair.Key, value);
                             break;
                     }
