@@ -229,7 +229,7 @@ namespace System.Net.Wunderlist
 #endif
 			else if (t == typeof(DateTime)) return ((DateTime)value).ToString(CultureInfo.InvariantCulture);
 			else if (t == typeof(int)) return ((int)value).ToString(CultureInfo.InvariantCulture);
-			else if (t == typeof(bool)) return ((bool)value) ? "1" : "0";
+			else if (t == typeof(bool)) return ((bool)value) ? Boolean.TrueString : Boolean.FalseString;
 
 			return escapeStrings ? Uri.EscapeDataString(value.ToString()) : value.ToString();
 		}
