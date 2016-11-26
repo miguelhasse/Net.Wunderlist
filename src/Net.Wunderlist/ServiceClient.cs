@@ -646,9 +646,9 @@ namespace System.Net.Wunderlist
 				return await client.SendAsync<MainTask>("tasks", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
 			}
 
-			public async Task<MainTask> UpdateAsync(uint id, int revision, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
+			public async Task<MainTask> UpdateAsync(uint id, int revision, uint? listId, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
 			{
-				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "title", name }, { "assignee_id", assigneeId }, { "completed", completed }, { "recurrence_type", recurrenceType }, { "due_date", dueDate }, { "starred", starred } };
+				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "list_id", listId }, { "title", name }, { "assignee_id", assigneeId }, { "completed", completed }, { "recurrence_type", recurrenceType }, { "due_date", dueDate }, { "starred", starred } };
 				requestContent.Add("remove", requestContent.Where(s => s.Value == null).ToArray());
 
 				if (recurrenceType.HasValue)
@@ -789,7 +789,7 @@ namespace System.Net.Wunderlist
 
 			public async Task<Webhook> CreateAsync(uint listId, Uri endpoint, string processorType, string configuration, CancellationToken cancellationToken)
 			{
-				var requestContent = new Dictionary<string, object> { { "list_id", listId }, { "url", endpoint }, { "processor_type", processorType }, { "configuration", configuration } };
+				var requestContent = new Dictionary<string, object> { { "list_id", listId }, { "url", endpoint }, { "processor_type", processorType ?? "generic" }, { "configuration", configuration ?? String.Empty } };
 				return await client.SendAsync<Webhook>("webhooks", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
 			}
 
