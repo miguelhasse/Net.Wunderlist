@@ -271,9 +271,9 @@ namespace System.Net.Wunderlist
             DueDate = jtoken.Value<DateTime?>("due_date");
             CreatedBy = jtoken.Value<int>("created_by_id");
             CompletedBy = jtoken.Value<int?>("completed_by_id");
-            CompletedAt = jtoken.Value<DateTime?>("due_date");
+            CompletedAt = jtoken.Value<DateTime?>("completed_at");
         }
-
+        
         public string Title { get; set; } // max lenght 255
 
         public uint ListId { get; internal set; }
