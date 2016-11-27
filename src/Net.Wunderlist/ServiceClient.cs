@@ -212,9 +212,12 @@ namespace System.Net.Wunderlist
 						return new JProperty(s.Key, s.Value);
 					})
 					.ToArray()));
-				return new StringContent(contentObject.ToString(), null, Constants.MediaTypeNames.Json);
-			}
-			return null;
+#if DEBUG
+                Diagnostics.Debug.WriteLine(contentObject);
+#endif
+                return new StringContent(contentObject.ToString(), null, Constants.MediaTypeNames.Json);
+            }
+            return null;
 		}
 
 		private static string ConvertParameterValue(object value, bool escapeStrings)
@@ -648,14 +651,13 @@ namespace System.Net.Wunderlist
 
 			public async Task<MainTask> UpdateAsync(uint id, int revision, uint? listId, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
 			{
-				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "list_id", listId }, { "title", name }, { "assignee_id", assigneeId }, { "completed", completed }, { "recurrence_type", recurrenceType }, { "due_date", dueDate }, { "starred", starred } };
-				requestContent.Add("remove", requestContent.Where(s => s.Value == null).ToArray());
+				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "list_id", listId }, { "title", name }, { "assignee_id", assigneeId }, { "recurrence_type", recurrenceType }, { "recurrence_count", recurrenceCount }, { "due_date", dueDate }, { "starred", starred } };
+                requestContent.Add("remove", requestContent.Where(s => s.Value == null).Select(s => s.Key).ToArray());
+                requestContent.Add("completed", completed); // completed attribute cannot be removed
 
-				if (recurrenceType.HasValue)
-				{
-					if (!recurrenceCount.HasValue) throw new ArgumentNullException("recurrenceCount");
-					requestContent.Add("recurrence_count", recurrenceCount);
-				}
+                if (recurrenceType.HasValue && !recurrenceCount.HasValue)
+                    throw new ArgumentNullException("recurrenceCount");
+
 				return await client.PatchAsync<MainTask>(ServiceClient.BuildCommand("tasks", id), null, requestContent, cancellationToken).ConfigureAwait(false);
 			}
 
