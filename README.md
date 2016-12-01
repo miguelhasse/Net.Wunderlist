@@ -1,4 +1,5 @@
 ## Wunderlist Client for .NET ##
+[![NuGet Status](http://img.shields.io/nuget/v/hasseware.wunderlist.svg?style=flat)](https://www.nuget.org/packages/hasseware.wunderlist/)
 
 Implements asynchronous operations and includes support for portable class libraries.
 
