@@ -10,9 +10,9 @@ namespace System.Net.Wunderlist.Internal
         public override bool CanConvert(Type objectType)
         {
 #if PORTABLE
-            return typeof(Resource).GetTypeInfo().IsAssignableFrom(objectType.GetTypeInfo());
+            return typeof(Resource).GetTypeInfo().IsAssignableFrom(objectType.GetTypeInfo()) || objectType == typeof(ResourcePart) || objectType == typeof(ResourceRevision);
 #else
-            return typeof(Resource).IsAssignableFrom(objectType);
+            return typeof(Resource).IsAssignableFrom(objectType) || objectType == typeof(ResourcePart) || objectType == typeof(ResourceRevision);
 #endif
         }
 
@@ -36,6 +36,8 @@ namespace System.Net.Wunderlist.Internal
                     case "User": return new User(jtoken);
                     case "Webhook": return new Webhook(jtoken);
                     case "Positions": return new Positions(jtoken);
+                    case "ResourcePart": return new ResourcePart(jtoken);
+                    case "ResourceRevision": return new ResourceRevision(jtoken);
                 }
                 throw new JsonSerializationException(String.Format(CultureInfo.InvariantCulture,
                     "Unexpected object type when converting resource: {0}", objectType));

@@ -55,9 +55,22 @@ namespace System.Net.Wunderlist
     public abstract class VersionedResource : Resource
     {
         internal VersionedResource(JToken jtoken) : base(jtoken)
-        {
+        {            
             Revision = jtoken.Value<int>("revision");
         }
+
+        public int Revision { get; internal set; }
+    }
+
+    public class ResourceRevision
+    {
+        internal ResourceRevision(JToken jtoken)
+        {
+            Id = jtoken.Value<uint>("id");
+            Revision = jtoken.Value<int>("revision");
+        }
+
+        public uint Id { get; internal set; }
 
         public int Revision { get; internal set; }
     }

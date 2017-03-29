@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -34,7 +33,8 @@ namespace System.Net.Wunderlist
 			this.storage = new Lazy<IStorageProvider>(storageFactory);
             
 			this.Files = new FileContext(this);
-			this.Lists = new ListContext(this);
+            this.Folders = new FolderContext(this);
+            this.Lists = new ListContext(this);
 			this.Memberships = new MembershipContext(this);
             this.Notes = new NoteContext(this);
             this.Reminders = new ReminderContext(this);
@@ -58,14 +58,15 @@ namespace System.Net.Wunderlist
 
 		public IFileInfo Files { get; private set; }
 
-		public IListInfo Lists { get; private set; }
+        public IFolderInfo Folders { get; private set; }
+
+        public IListInfo Lists { get; private set; }
 
 		public IMembershipInfo Memberships { get; private set; }
 
-        public INoteInfo Notes { get; private set; }
-        
-
-        public IReminderInfo Reminders { get; private set; }
+		public INoteInfo Notes { get; private set; }
+		
+		public IReminderInfo Reminders { get; private set; }
 
 		public ICommentInfo Comments { get; private set; }
 
@@ -369,6 +370,49 @@ namespace System.Net.Wunderlist
 			}
 		}
 
+		private sealed class FolderContext : IFolderInfo
+		{
+			private ServiceClient client;
+
+			internal FolderContext(ServiceClient client)
+			{
+				this.client = client;
+			}
+
+			public async Task<IEnumerable<Folder>> GetAsync(CancellationToken cancellationToken)
+			{
+                return await client.GetAsync<IEnumerable<Folder>>("folders", null, cancellationToken).ConfigureAwait(false);
+            }
+
+            public async Task<Folder> GetAsync(uint id, CancellationToken cancellationToken)
+			{
+                return await client.GetAsync<Folder>(ServiceClient.BuildCommand("folders", id), null, cancellationToken).ConfigureAwait(false);
+            }
+
+            public async Task<Folder> CreateAsync(string name, IEnumerable<int> ids, CancellationToken cancellationToken)
+			{
+                var requestContent = new Dictionary<string, object> { { "title", name }, { "list_ids", ids } };
+                return await client.SendAsync<Folder>("folders", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+            }
+
+            public async Task<Folder> UpdateAsync(uint id, int revision, string name, IEnumerable<int> ids, CancellationToken cancellationToken)
+			{
+                var requestContent = new Dictionary<string, object> { { "revision", revision }, { "title", name } };
+                return await client.PatchAsync<Folder>(ServiceClient.BuildCommand("folders", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+            }
+
+            public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			{
+                var parameters = new Dictionary<string, object> { { "revision", revision } };
+                await client.SendAsync(ServiceClient.BuildCommand("folders", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+            }
+
+            public async Task<IEnumerable<ResourceRevision>> GetRevisionsAsync(CancellationToken cancellationToken)
+			{
+                return await client.GetAsync<IEnumerable<ResourceRevision>>("folder_revisions", null, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
 		private sealed class ListContext : IListInfo
 		{
 			private ServiceClient client;
@@ -620,7 +664,7 @@ namespace System.Net.Wunderlist
 				return await client.GetAsync<MainTask>(ServiceClient.BuildCommand("tasks", id), null, cancellationToken).ConfigureAwait(false);
 			}
 
-			public async Task<IEnumerable<MainTask>> GetAsync(uint listId, bool? completed, CancellationToken cancellationToken)
+			public async Task<IEnumerable<MainTask>> GetByListAsync(uint listId, bool? completed, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId }, { "completed", completed } };
 				return await client.GetAsync<IEnumerable<MainTask>>("tasks", parameters, cancellationToken).ConfigureAwait(false);

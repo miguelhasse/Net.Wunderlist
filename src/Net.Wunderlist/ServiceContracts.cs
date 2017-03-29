@@ -32,6 +32,8 @@ namespace System.Net.Wunderlist
         Task<Folder> UpdateAsync(uint id, int revision, string name, IEnumerable<int> ids, CancellationToken cancellationToken);
 
         Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken);
+
+        Task<IEnumerable<ResourceRevision>> GetRevisionsAsync(CancellationToken cancellationToken);
     }
 
     public interface IListInfo
@@ -117,7 +119,7 @@ namespace System.Net.Wunderlist
     {
         Task<MainTask> GetAsync(uint id, CancellationToken cancellationToken);
 
-        Task<IEnumerable<MainTask>> GetAsync(uint listId, bool? completed, CancellationToken cancellationToken);
+        Task<IEnumerable<MainTask>> GetByListAsync(uint listId, bool? completed, CancellationToken cancellationToken);
 
         Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken);
 
