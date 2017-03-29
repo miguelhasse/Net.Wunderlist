@@ -31,13 +31,13 @@ namespace System.Net.Wunderlist
 			this.client = new HttpClient(Authorization.GetAuthorizationHandler(null, accessToken, clientSecret));
 			this.client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.MediaTypeNames.Json));
 			this.storage = new Lazy<IStorageProvider>(storageFactory);
-            
+			
 			this.Files = new FileContext(this);
-            this.Folders = new FolderContext(this);
-            this.Lists = new ListContext(this);
+			this.Folders = new FolderContext(this);
+			this.Lists = new ListContext(this);
 			this.Memberships = new MembershipContext(this);
-            this.Notes = new NoteContext(this);
-            this.Reminders = new ReminderContext(this);
+			this.Notes = new NoteContext(this);
+			this.Reminders = new ReminderContext(this);
 			this.Comments = new CommentContext(this);
 			this.Tasks = new TaskContext(this);
 			this.Subtasks = new SubtaskContext(this);
@@ -58,9 +58,9 @@ namespace System.Net.Wunderlist
 
 		public IFileInfo Files { get; private set; }
 
-        public IFolderInfo Folders { get; private set; }
+		public IFolderInfo Folders { get; private set; }
 
-        public IListInfo Lists { get; private set; }
+		public IListInfo Lists { get; private set; }
 
 		public IMembershipInfo Memberships { get; private set; }
 
@@ -102,22 +102,39 @@ namespace System.Net.Wunderlist
 
 		private Task<T> GetAsync<T>(string cmd, IDictionary<string, object> parameters, CancellationToken cancellationToken)
 		{
-			return GetAsync(cmd, parameters, cancellationToken).ContinueWith(t => Deserialize<T>(t.Result)).Unwrap();
+			return GetAsync(cmd, parameters, cancellationToken)
+				.ContinueWith(t => DeserializeAsync<T>(t.Result))
+				.Unwrap();
+		}
+
+		private Task<dynamic> GetDynamicAsync(string cmd, IDictionary<string, object> parameters, CancellationToken cancellationToken)
+		{
+			return GetAsync(cmd, parameters, cancellationToken)
+				.ContinueWith(t => DeserializeDynamicAsync(t.Result))
+				.Unwrap();
 		}
 
 		private Task<HttpResponseMessage> GetAsync(string cmd, IDictionary<string, object> parameters, CancellationToken cancellationToken)
 		{
 			TaskCompletionSource<HttpResponseMessage> tcs = new TaskCompletionSource<HttpResponseMessage>();
 
-			this.client.GetAsync(CreateRequestUri(cmd, parameters),
-				HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+			this.client.GetAsync(CreateRequestUri(cmd, parameters), HttpCompletionOption.ResponseHeadersRead, cancellationToken)
 				.ContinueWith(t => HandleResponseCompletion(t, tcs));
 			return tcs.Task;
 		}
 
 		private Task<T> PatchAsync<T>(string cmd, IDictionary<string, object> parameters, IDictionary<string, object> content, CancellationToken cancellationToken)
 		{
-			return PatchAsync(cmd, parameters, content, cancellationToken).ContinueWith(t => Deserialize<T>(t.Result)).Unwrap();
+			return PatchAsync(cmd, parameters, content, cancellationToken)
+				.ContinueWith(t => DeserializeAsync<T>(t.Result))
+				.Unwrap();
+		}
+
+		private Task<dynamic> PatchDynamicAsync(string cmd, IDictionary<string, object> parameters, IDictionary<string, object> content, CancellationToken cancellationToken)
+		{
+			return PatchAsync(cmd, parameters, content, cancellationToken)
+				.ContinueWith(t => DeserializeDynamicAsync(t.Result))
+				.Unwrap();
 		}
 
 		private Task<HttpResponseMessage> PatchAsync(string cmd, IDictionary<string, object> parameters, IDictionary<string, object> content, CancellationToken cancellationToken)
@@ -132,7 +149,9 @@ namespace System.Net.Wunderlist
 
 		private Task<T> SendAsync<T>(string cmd, IDictionary<string, object> parameters, IDictionary<string, object> content, HttpMethod method, CancellationToken cancellationToken)
 		{
-			return SendAsync(cmd, parameters, content, method, cancellationToken).ContinueWith(t => Deserialize<T>(t.Result)).Unwrap();
+			return SendAsync(cmd, parameters, content, method, cancellationToken)
+				.ContinueWith(t => DeserializeAsync<T>(t.Result))
+				.Unwrap();
 		}
 
 		private Task<HttpResponseMessage> SendAsync(string cmd, IDictionary<string, object> parameters, IDictionary<string, object> content, HttpMethod method, CancellationToken cancellationToken)
@@ -145,22 +164,28 @@ namespace System.Net.Wunderlist
 			return tcs.Task;
 		}
 
-		private static async Task<T> Deserialize<T>(HttpResponseMessage response)
+		private static Task<T> DeserializeAsync<T>(HttpResponseMessage response)
 		{
-			string responseJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+			return response.Content.ReadAsStringAsync()
+				.ContinueWith<T>(t =>
+				{
 #if DEBUG
-			Diagnostics.Debug.WriteLine(responseJson);
+					System.Diagnostics.Debug.WriteLine(t.Result);
 #endif
-			return JsonConvert.DeserializeObject<T>(responseJson, jsonSettings);
+					return JsonConvert.DeserializeObject<T>(t.Result, jsonSettings);
+				}, TaskContinuationOptions.OnlyOnRanToCompletion);
 		}
 
-		private static async Task<JObject> DeserializeDynamic(HttpResponseMessage response)
+		private static Task<dynamic> DeserializeDynamicAsync(HttpResponseMessage response)
 		{
-			string responseJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+			return response.Content.ReadAsStringAsync()
+				.ContinueWith<dynamic>(t =>
+				{
 #if DEBUG
-			Diagnostics.Debug.WriteLine(responseJson);
+					System.Diagnostics.Debug.WriteLine(t.Result);
 #endif
-			return (JObject)JsonConvert.DeserializeObject(responseJson);
+					return JsonConvert.DeserializeObject(t.Result, jsonSettings);
+				}, TaskContinuationOptions.OnlyOnRanToCompletion);
 		}
 
 		private static void HandleResponseCompletion(Task<HttpResponseMessage> task, TaskCompletionSource<HttpResponseMessage> tcs)
@@ -214,11 +239,11 @@ namespace System.Net.Wunderlist
 					})
 					.ToArray()));
 #if DEBUG
-                Diagnostics.Debug.WriteLine(contentObject);
+				Diagnostics.Debug.WriteLine(contentObject);
 #endif
-                return new StringContent(contentObject.ToString(), null, Constants.MediaTypeNames.Json);
-            }
-            return null;
+				return new StringContent(contentObject.ToString(), null, Constants.MediaTypeNames.Json);
+			}
+			return null;
 		}
 
 		private static string ConvertParameterValue(object value, bool escapeStrings)
@@ -301,10 +326,10 @@ namespace System.Net.Wunderlist
 				}
 			}
 
-			private async Task<File> CreateInternalAsync(uint taskId, uint uploadId, DateTime? createdAt, CancellationToken cancellationToken)
+			private Task<File> CreateInternalAsync(uint taskId, uint uploadId, DateTime? createdAt, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "upload_id", uploadId }, { "task_id", taskId }, { "local_created_at", createdAt } };
-				return await client.SendAsync<File>("files", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<File>("files", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
 			private async Task UploadFilePartAsync(IO.Stream stream, ResourcePart part, CancellationToken cancellationToken)
@@ -320,53 +345,53 @@ namespace System.Net.Wunderlist
 				}
 			}
 
-			private async Task<ResourcePart> UploadStartAsync(string name, int contentLength, string contentType, int? part, string md5sum, CancellationToken cancellationToken)
+			private Task<ResourcePart> UploadStartAsync(string name, int contentLength, string contentType, int? part, string md5sum, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "file_name", name }, { "file_size", contentLength }, { "content_type", contentType }, { "part_number", part }, { "md5sum", md5sum } };
-				return await client.SendAsync<ResourcePart>("uploads", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<ResourcePart>("uploads", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			private async Task<ResourcePart> UploadNextAsync(uint uploadId, int part, string md5sum, CancellationToken cancellationToken)
+			private Task<ResourcePart> UploadNextAsync(uint uploadId, int part, string md5sum, CancellationToken cancellationToken)
 			{
 				string cmd = String.Format("uploads/{0}/parts", part);
 				var parameters = new Dictionary<string, object> { { "part_number", part }, { "md5sum", md5sum } };
-				return await client.GetAsync<ResourcePart>(cmd, parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<ResourcePart>(cmd, parameters, cancellationToken);
 			}
 
-			private async Task UploadFinishedAsync(uint uploadId, CancellationToken cancellationToken)
+			private Task UploadFinishedAsync(uint uploadId, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "state", "finished" } };
-				await client.PatchAsync<ResourcePart>(ServiceClient.BuildCommand("uploads", uploadId), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<ResourcePart>(ServiceClient.BuildCommand("uploads", uploadId), null, requestContent, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("files", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("files", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 
-			public async Task<File> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<File> GetAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<File>(ServiceClient.BuildCommand("files", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<File>(ServiceClient.BuildCommand("files", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<File>> GetByListAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<File>> GetByListAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<File>>("files", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<File>>("files", parameters, cancellationToken);
 			}
 
-			public async Task<IEnumerable<File>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
+			public Task<IEnumerable<File>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "task_id", taskId } };
-				return await client.GetAsync<IEnumerable<File>>("files", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<File>>("files", parameters, cancellationToken);
 			}
 
-			public async Task<Uri> GetPreviewAsync(uint id, PreviewPlatform? platform, bool retina, CancellationToken cancellationToken)
+			public Task<Uri> GetPreviewAsync(uint id, PreviewPlatform? platform, bool retina, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "file_id", id }, { "platform", platform }, { "size", retina ? "retina" : "nonretina" } };
-				var response = await client.GetAsync("previews", parameters, cancellationToken).ConfigureAwait(false);
-				return new Uri((await DeserializeDynamic(response)).Value<string>("url"));
+				return client.GetDynamicAsync("previews", parameters, cancellationToken)
+					.ContinueWith(t => new Uri(t.Result.Value<string>("url")), TaskContinuationOptions.OnlyOnRanToCompletion);
 			}
 		}
 
@@ -379,39 +404,39 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<IEnumerable<Folder>> GetAsync(CancellationToken cancellationToken)
+			public Task<IEnumerable<Folder>> GetAsync(uint? id, CancellationToken cancellationToken)
 			{
-                return await client.GetAsync<IEnumerable<Folder>>("folders", null, cancellationToken).ConfigureAwait(false);
-            }
+                if (id.HasValue)
+                {
+                    return client.GetAsync<Folder>(ServiceClient.BuildCommand("folders", id.Value), null, cancellationToken)
+                        .ContinueWith<IEnumerable<Folder>>(t => new List<Folder> { t.Result }, TaskContinuationOptions.OnlyOnRanToCompletion);
+                }
+                return client.GetAsync<IEnumerable<Folder>>("folders", null, cancellationToken);
+			}
 
-            public async Task<Folder> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<Folder> CreateAsync(string name, IEnumerable<int> ids, CancellationToken cancellationToken)
 			{
-                return await client.GetAsync<Folder>(ServiceClient.BuildCommand("folders", id), null, cancellationToken).ConfigureAwait(false);
-            }
+				var requestContent = new Dictionary<string, object> { { "title", name }, { "list_ids", ids } };
+				return client.SendAsync<Folder>("folders", null, requestContent, HttpMethod.Post, cancellationToken);
+			}
 
-            public async Task<Folder> CreateAsync(string name, IEnumerable<int> ids, CancellationToken cancellationToken)
+			public Task<Folder> UpdateAsync(uint id, int revision, string name, IEnumerable<int> ids, CancellationToken cancellationToken)
 			{
-                var requestContent = new Dictionary<string, object> { { "title", name }, { "list_ids", ids } };
-                return await client.SendAsync<Folder>("folders", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
-            }
+				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "title", name } };
+				return client.PatchAsync<Folder>(ServiceClient.BuildCommand("folders", id), null, requestContent, cancellationToken);
+			}
 
-            public async Task<Folder> UpdateAsync(uint id, int revision, string name, IEnumerable<int> ids, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
-                var requestContent = new Dictionary<string, object> { { "revision", revision }, { "title", name } };
-                return await client.PatchAsync<Folder>(ServiceClient.BuildCommand("folders", id), null, requestContent, cancellationToken).ConfigureAwait(false);
-            }
+				var parameters = new Dictionary<string, object> { { "revision", revision } };
+				return client.SendAsync(ServiceClient.BuildCommand("folders", id), parameters, null, HttpMethod.Delete, cancellationToken);
+			}
 
-            public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task<IEnumerable<ResourceRevision>> GetRevisionsAsync(CancellationToken cancellationToken)
 			{
-                var parameters = new Dictionary<string, object> { { "revision", revision } };
-                await client.SendAsync(ServiceClient.BuildCommand("folders", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
-            }
-
-            public async Task<IEnumerable<ResourceRevision>> GetRevisionsAsync(CancellationToken cancellationToken)
-			{
-                return await client.GetAsync<IEnumerable<ResourceRevision>>("folder_revisions", null, cancellationToken).ConfigureAwait(false);
-            }
-        }
+				return client.GetAsync<IEnumerable<ResourceRevision>>("folder_revisions", null, cancellationToken);
+			}
+		}
 
 		private sealed class ListContext : IListInfo
 		{
@@ -422,56 +447,55 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<IEnumerable<List>> GetAsync(CancellationToken cancellationToken)
+			public Task<IEnumerable<List>> GetAsync(uint? id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<IEnumerable<List>>("lists", null, cancellationToken).ConfigureAwait(false);
+                if (id.HasValue)
+                {
+                    return client.GetAsync<List>(ServiceClient.BuildCommand("lists", id), null, cancellationToken)
+                        .ContinueWith<IEnumerable<List>>(t => new List<List> { t.Result }, TaskContinuationOptions.OnlyOnRanToCompletion);
+                }
+                return client.GetAsync<IEnumerable<List>>("lists", null, cancellationToken);
+            }
+
+			public Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken)
+			{
+				return client.GetAsync<Positions>(ServiceClient.BuildCommand("list_positions", id), null, cancellationToken);
 			}
 
-			public async Task<List> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<IEnumerable<Positions>> GetPositionsAsync(CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<List>(ServiceClient.BuildCommand("lists", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Positions>>("list_positions", null, cancellationToken);
 			}
 
-			public async Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken)
-			{
-				return await client.GetAsync<Positions>(ServiceClient.BuildCommand("list_positions", id), null, cancellationToken).ConfigureAwait(false);
-			}
-
-			public async Task<IEnumerable<Positions>> GetPositionsAsync(CancellationToken cancellationToken)
-			{
-				return await client.GetAsync<IEnumerable<Positions>>("list_positions", null, cancellationToken).ConfigureAwait(false);
-			}
-
-			public async Task<bool> ChangeStateAsync(uint id, int revision, bool makePublic, CancellationToken cancellationToken)
+			public Task<bool> ChangeStateAsync(uint id, int revision, bool makePublic, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "public", makePublic } };
-				var response = await client.PatchAsync(ServiceClient.BuildCommand("lists", id), null, requestContent, cancellationToken).ConfigureAwait(false);
-				return (await DeserializeDynamic(response)).Value<bool>("public");
-
+				return client.PatchDynamicAsync(ServiceClient.BuildCommand("lists", id), null, requestContent, cancellationToken)
+					.ContinueWith(t => (bool)t.Result.Value<bool>("public"), TaskContinuationOptions.OnlyOnRanToCompletion);
 			}
 
-			public async Task<List> CreateAsync(string name, CancellationToken cancellationToken)
+			public Task<List> CreateAsync(string name, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "title", name } };
-				return await client.SendAsync<List>("lists", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<List>("lists", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task<List> UpdateAsync(uint id, int revision, string name, CancellationToken cancellationToken)
+			public Task<List> UpdateAsync(uint id, int revision, string name, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "title", name } };
-				return await client.PatchAsync<List>(ServiceClient.BuildCommand("lists", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<List>(ServiceClient.BuildCommand("lists", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task<Positions> UpdatePositionAsync(uint id, int revision, IEnumerable<int> positions, CancellationToken cancellationToken)
+			public Task<Positions> UpdatePositionAsync(uint id, int revision, IEnumerable<int> positions, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "values", positions } };
-				return await client.PatchAsync<Positions>(ServiceClient.BuildCommand("list_positions", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Positions>(ServiceClient.BuildCommand("list_positions", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("lists", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("lists", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 		}
 
@@ -484,33 +508,33 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<Membership> UpdateAsync(uint id, int revision, MembershipState state, bool muted, CancellationToken cancellationToken)
+			public Task<Membership> UpdateAsync(uint id, int revision, MembershipState state, bool muted, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "state", state }, { "muted", muted } };
-				return await client.PatchAsync<Membership>(ServiceClient.BuildCommand("memberships", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Membership>(ServiceClient.BuildCommand("memberships", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task<Membership> CreateAsync(uint listId, string email, bool muted, CancellationToken cancellationToken)
+			public Task<Membership> CreateAsync(uint listId, string email, bool muted, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "list_id", listId }, { "email", email }, { "muted", muted } };
-				return await client.SendAsync<Membership>("memberships", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<Membership>("memberships", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task<Membership> CreateAsync(uint listId, uint userId, bool muted, CancellationToken cancellationToken)
+			public Task<Membership> CreateAsync(uint listId, uint userId, bool muted, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "list_id", listId }, { "user_id", userId }, { "muted", muted } };
-				return await client.SendAsync<Membership>("memberships", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<Membership>("memberships", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("memberships", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("memberships", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Membership>> GetAsync(uint? listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Membership>> GetByListAsync(uint? listId, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<IEnumerable<Membership>>(ServiceClient.BuildCommand("memberships", listId), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Membership>>(ServiceClient.BuildCommand("memberships", listId), null, cancellationToken);
 			}
 		}
 
@@ -523,40 +547,39 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<Note> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<Note> GetAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<Note>(ServiceClient.BuildCommand("notes", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<Note>(ServiceClient.BuildCommand("notes", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Note>> GetByListAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Note>> GetByListAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<Note>>("notes", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Note>>("notes", parameters, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Note>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Note>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "task_id", taskId } };
-				return await client.GetAsync<IEnumerable<Note>>("notes", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Note>>("notes", parameters, cancellationToken);
 			}
 
-			public async Task<Note> CreateAsync(uint taskId, string content, CancellationToken cancellationToken)
+			public Task<Note> CreateAsync(uint taskId, string content, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "task_id", taskId }, { "content", content } };
-				return await client.SendAsync<Note>("notes", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<Note>("notes", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task<Note> UpdateAsync(uint id, int revision, string content, CancellationToken cancellationToken)
+			public Task<Note> UpdateAsync(uint id, int revision, string content, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "content", content } };
-				return await client.PatchAsync<Note>(ServiceClient.BuildCommand("notes", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Note>(ServiceClient.BuildCommand("notes", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("notes", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
-
+				return client.SendAsync(ServiceClient.BuildCommand("notes", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 		}
 
@@ -569,39 +592,39 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<Reminder> CreateAsync(uint taskId, DateTime date, string deviceUdid, CancellationToken cancellationToken)
+			public Task<Reminder> CreateAsync(uint taskId, DateTime date, string deviceUdid, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "task_id", taskId }, { "date", date }, { "created_by_device_udid", deviceUdid } };
-				return await client.SendAsync<Reminder>("reminders", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<Reminder>("reminders", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("reminders", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("reminders", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 
-			public async Task<Reminder> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<Reminder> GetAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<Reminder>(ServiceClient.BuildCommand("reminders", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<Reminder>(ServiceClient.BuildCommand("reminders", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Reminder>> GetByListAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Reminder>> GetByListAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<Reminder>>("reminders", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Reminder>>("reminders", parameters, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Reminder>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Reminder>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "task_id", taskId } };
-				return await client.GetAsync<IEnumerable<Reminder>>("reminders", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Reminder>>("reminders", parameters, cancellationToken);
 			}
 
-			public async Task<Reminder> UpdateAsync(uint id, int revision, DateTime date, CancellationToken cancellationToken)
+			public Task<Reminder> UpdateAsync(uint id, int revision, DateTime date, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "date", date } };
-				return await client.PatchAsync<Reminder>(ServiceClient.BuildCommand("reminders", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Reminder>(ServiceClient.BuildCommand("reminders", id), null, requestContent, cancellationToken);
 			}
 		}
 
@@ -614,39 +637,39 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<Comment> CreateAsync(uint taskId, string comment, CancellationToken cancellationToken)
+			public Task<Comment> CreateAsync(uint taskId, string comment, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "task_id", taskId }, { "text", comment } };
-				return await client.SendAsync<Comment>("task_comments", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<Comment>("task_comments", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("task_comments", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("task_comments", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 
-			public async Task<Comment> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<Comment> GetAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<Comment>(ServiceClient.BuildCommand("task_comments", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<Comment>(ServiceClient.BuildCommand("task_comments", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Comment>> GetByListAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Comment>> GetByListAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<Comment>>("task_comments", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Comment>>("task_comments", parameters, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Comment>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Comment>> GetByTaskAsync(uint taskId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "task_id", taskId } };
-				return await client.GetAsync<IEnumerable<Comment>>("task_comments", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Comment>>("task_comments", parameters, cancellationToken);
 			}
 
-			public async Task<Comment> UpdateAsync(uint id, int revision, string comment, CancellationToken cancellationToken)
+			public Task<Comment> UpdateAsync(uint id, int revision, string comment, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "text", comment } };
-				return await client.PatchAsync<Comment>(ServiceClient.BuildCommand("task_comments", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Comment>(ServiceClient.BuildCommand("task_comments", id), null, requestContent, cancellationToken);
 			}
 		}
 
@@ -659,29 +682,29 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<MainTask> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<MainTask> GetAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<MainTask>(ServiceClient.BuildCommand("tasks", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<MainTask>(ServiceClient.BuildCommand("tasks", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<MainTask>> GetByListAsync(uint listId, bool? completed, CancellationToken cancellationToken)
+			public Task<IEnumerable<MainTask>> GetByListAsync(uint listId, bool? completed, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId }, { "completed", completed } };
-				return await client.GetAsync<IEnumerable<MainTask>>("tasks", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<MainTask>>("tasks", parameters, cancellationToken);
 			}
 
-			public async Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken)
+			public Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<Positions>(ServiceClient.BuildCommand("task_positions", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<Positions>(ServiceClient.BuildCommand("task_positions", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Positions>> GetPositionsAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Positions>> GetPositionsAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<Positions>>("task_positions", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Positions>>("task_positions", parameters, cancellationToken);
 			}
 
-			public async Task<MainTask> CreateAsync(uint listId, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
+			public Task<MainTask> CreateAsync(uint listId, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "list_id", listId }, { "title", name }, { "assignee_id", assigneeId }, { "completed", completed }, { "recurrence_type", recurrenceType }, { "due_date", dueDate }, { "starred", starred } };
 
@@ -690,31 +713,31 @@ namespace System.Net.Wunderlist
 					if (!recurrenceCount.HasValue) throw new ArgumentNullException("recurrenceCount");
 					requestContent.Add("recurrence_count", recurrenceCount);
 				}
-				return await client.SendAsync<MainTask>("tasks", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<MainTask>("tasks", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task<MainTask> UpdateAsync(uint id, int revision, uint? listId, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
+			public Task<MainTask> UpdateAsync(uint id, int revision, uint? listId, string name, uint? assigneeId, bool? completed, RecurrenceType? recurrenceType, int? recurrenceCount, DateTime? dueDate, bool? starred, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "list_id", listId }, { "title", name }, { "assignee_id", assigneeId }, { "recurrence_type", recurrenceType }, { "recurrence_count", recurrenceCount }, { "due_date", dueDate }, { "starred", starred } };
-                requestContent.Add("remove", requestContent.Where(s => s.Value == null).Select(s => s.Key).ToArray());
-                requestContent.Add("completed", completed); // completed attribute cannot be removed
+				requestContent.Add("remove", requestContent.Where(s => s.Value == null).Select(s => s.Key).ToArray());
+				requestContent.Add("completed", completed); // completed attribute cannot be removed
 
-                if (recurrenceType.HasValue && !recurrenceCount.HasValue)
-                    throw new ArgumentNullException("recurrenceCount");
+				if (recurrenceType.HasValue && !recurrenceCount.HasValue)
+					throw new ArgumentNullException("recurrenceCount");
 
-				return await client.PatchAsync<MainTask>(ServiceClient.BuildCommand("tasks", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<MainTask>(ServiceClient.BuildCommand("tasks", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task<Positions> UpdatePositionAsync(uint id, int revision, IEnumerable<int> positions, CancellationToken cancellationToken)
+			public Task<Positions> UpdatePositionAsync(uint id, int revision, IEnumerable<int> positions, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "values", positions } };
-				return await client.PatchAsync<Positions>(ServiceClient.BuildCommand("task_positions", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Positions>(ServiceClient.BuildCommand("task_positions", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("tasks", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("tasks", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 		}
 
@@ -727,62 +750,62 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<SubTask> GetAsync(uint id, CancellationToken cancellationToken)
+			public Task<SubTask> GetAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<SubTask>(ServiceClient.BuildCommand("subtasks", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<SubTask>(ServiceClient.BuildCommand("subtasks", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<SubTask>> GetByListAsync(uint listId, bool? completed, CancellationToken cancellationToken)
+			public Task<IEnumerable<SubTask>> GetByListAsync(uint listId, bool? completed, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId }, { "completed", completed } };
-				return await client.GetAsync<IEnumerable<SubTask>>("subtasks", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<SubTask>>("subtasks", parameters, cancellationToken);
 			}
 
-			public async Task<IEnumerable<SubTask>> GetByTaskAsync(uint taskId, bool? completed, CancellationToken cancellationToken)
+			public Task<IEnumerable<SubTask>> GetByTaskAsync(uint taskId, bool? completed, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "task_id", taskId }, { "completed", completed } };
-				return await client.GetAsync<IEnumerable<SubTask>>("subtasks", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<SubTask>>("subtasks", parameters, cancellationToken);
 			}
 
-			public async Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken)
+			public Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<Positions>(ServiceClient.BuildCommand("subtask_positions", id), null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<Positions>(ServiceClient.BuildCommand("subtask_positions", id), null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Positions>> GetPositionsByListAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Positions>> GetPositionsByListAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<Positions>>("subtask_positions", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Positions>>("subtask_positions", parameters, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Positions>> GetPositionsByTaskAsync(uint taskId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Positions>> GetPositionsByTaskAsync(uint taskId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "task_id", taskId } };
-				return await client.GetAsync<IEnumerable<Positions>>("subtask_positions", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Positions>>("subtask_positions", parameters, cancellationToken);
 			}
 
-			public async Task<SubTask> CreateAsync(uint taskId, string name, bool? completed, CancellationToken cancellationToken)
+			public Task<SubTask> CreateAsync(uint taskId, string name, bool? completed, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "task_id", taskId }, { "title", name }, { "completed", completed } };
-				return await client.SendAsync<SubTask>("subtasks", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<SubTask>("subtasks", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task<SubTask> UpdateAsync(uint id, int revision, string name, bool? completed, CancellationToken cancellationToken)
+			public Task<SubTask> UpdateAsync(uint id, int revision, string name, bool? completed, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "title", name }, { "completed", completed } };
-				return await client.PatchAsync<SubTask>(ServiceClient.BuildCommand("subtasks", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<SubTask>(ServiceClient.BuildCommand("subtasks", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task<Positions> UpdatePositionAsync(uint id, int revision, IEnumerable<int> positions, CancellationToken cancellationToken)
+			public Task<Positions> UpdatePositionAsync(uint id, int revision, IEnumerable<int> positions, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "revision", revision }, { "values", positions } };
-				return await client.PatchAsync<Positions>(ServiceClient.BuildCommand("subtask_positions", id), null, requestContent, cancellationToken).ConfigureAwait(false);
+				return client.PatchAsync<Positions>(ServiceClient.BuildCommand("subtask_positions", id), null, requestContent, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("subtasks", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("subtasks", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 		}
 
@@ -795,32 +818,32 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<User> GetAsync(CancellationToken cancellationToken)
+			public Task<User> GetAsync(CancellationToken cancellationToken)
 			{
-				return await client.GetAsync<User>("user", null, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<User>("user", null, cancellationToken);
 			}
 
-			public async Task<IEnumerable<User>> GetAsync(uint? listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<User>> GetByListAsync(uint? listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<User>>("users", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<User>>("users", parameters, cancellationToken);
 
 			}
 
-			public async Task<int> GetRootAsync(CancellationToken cancellationToken)
+			public Task<int> GetRootAsync(CancellationToken cancellationToken)
 			{
-				var response = await client.GetAsync("root", null, cancellationToken).ConfigureAwait(false);
-				return (await DeserializeDynamic(response)).Value<int>("id");
+				return client.GetDynamicAsync("root", null, cancellationToken)
+					.ContinueWith(t => (int)t.Result.Value<int>("id"), TaskContinuationOptions.OnlyOnRanToCompletion);
 			}
 
-			public async Task<Uri> GetAvatarAsync(uint userId, int? size, bool fallback, CancellationToken cancellationToken)
+			public Task<Uri> GetAvatarAsync(uint userId, int? size, bool fallback, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object>
 				{
 					{ "user_id", userId }, { "size", size }, { "fallback", fallback }
 				};
-				var response = await client.GetAsync("avatar", parameters, cancellationToken).ConfigureAwait(false);
-				return response.Headers.Location;
+				return client.GetAsync("avatar", parameters, cancellationToken)
+					.ContinueWith(t => t.Result.Headers.Location, TaskContinuationOptions.OnlyOnRanToCompletion);
 			}
 		}
 
@@ -833,22 +856,22 @@ namespace System.Net.Wunderlist
 				this.client = client;
 			}
 
-			public async Task<Webhook> CreateAsync(uint listId, Uri endpoint, string processorType, string configuration, CancellationToken cancellationToken)
+			public Task<Webhook> CreateAsync(uint listId, Uri endpoint, string processorType, string configuration, CancellationToken cancellationToken)
 			{
 				var requestContent = new Dictionary<string, object> { { "list_id", listId }, { "url", endpoint }, { "processor_type", processorType ?? "generic" }, { "configuration", configuration ?? String.Empty } };
-				return await client.SendAsync<Webhook>("webhooks", null, requestContent, HttpMethod.Post, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync<Webhook>("webhooks", null, requestContent, HttpMethod.Post, cancellationToken);
 			}
 
-			public async Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
+			public Task DeleteAsync(uint id, int revision, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "revision", revision } };
-				await client.SendAsync(ServiceClient.BuildCommand("webhooks", id), parameters, null, HttpMethod.Delete, cancellationToken).ConfigureAwait(false);
+				return client.SendAsync(ServiceClient.BuildCommand("webhooks", id), parameters, null, HttpMethod.Delete, cancellationToken);
 			}
 
-			public async Task<IEnumerable<Webhook>> GetByListAsync(uint listId, CancellationToken cancellationToken)
+			public Task<IEnumerable<Webhook>> GetByListAsync(uint listId, CancellationToken cancellationToken)
 			{
 				var parameters = new Dictionary<string, object> { { "list_id", listId } };
-				return await client.GetAsync<IEnumerable<Webhook>>("webhooks", parameters, cancellationToken).ConfigureAwait(false);
+				return client.GetAsync<IEnumerable<Webhook>>("webhooks", parameters, cancellationToken);
 			}
 		}
 

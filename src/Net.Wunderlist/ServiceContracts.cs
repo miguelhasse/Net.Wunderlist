@@ -23,9 +23,7 @@ namespace System.Net.Wunderlist
 
     public interface IFolderInfo
     {
-        Task<Folder> GetAsync(uint id, CancellationToken cancellationToken);
-
-        Task<IEnumerable<Folder>> GetAsync(CancellationToken cancellationToken);
+        Task<IEnumerable<Folder>> GetAsync(uint? id, CancellationToken cancellationToken);
 
         Task<Folder> CreateAsync(string name, IEnumerable<int> ids, CancellationToken cancellationToken);
 
@@ -38,9 +36,7 @@ namespace System.Net.Wunderlist
 
     public interface IListInfo
     {
-        Task<List> GetAsync(uint id, CancellationToken cancellationToken);
-
-        Task<IEnumerable<List>> GetAsync(CancellationToken cancellationToken);
+        Task<IEnumerable<List>> GetAsync(uint? id, CancellationToken cancellationToken);
 
         Task<Positions> GetPositionAsync(uint id, CancellationToken cancellationToken);
 
@@ -59,7 +55,7 @@ namespace System.Net.Wunderlist
 
     public interface IMembershipInfo
     {
-        Task<IEnumerable<Membership>> GetAsync(uint? listId, CancellationToken cancellationToken);
+        Task<IEnumerable<Membership>> GetByListAsync(uint? listId, CancellationToken cancellationToken);
 
         Task<Membership> CreateAsync(uint listId, string email, bool muted, CancellationToken cancellationToken);
 
@@ -176,7 +172,7 @@ namespace System.Net.Wunderlist
         /// </summary>
         /// <param name="listId">Restricts the list of returned users to only those who have access to a particular list.</param>
         /// <returns>All info related to the users who have access to a particular list.</returns>
-        Task<IEnumerable<User>> GetAsync(uint? listId, CancellationToken cancellationToken);
+        Task<IEnumerable<User>> GetByListAsync(uint? listId, CancellationToken cancellationToken);
 
         /// <summary>
         /// Fetch the Root for the current User.
